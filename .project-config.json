@@ -1,0 +1,9 @@
+{
+  "build_command": "pnpm run build",
+  "dev_command": "pnpm run dev",
+  "env_vars": {
+    "DATABASE_URL": ""
+  },
+  "git_remote": {},
+  "secrets": {}
+}
