@@ -162,18 +162,30 @@ describe("prescription router", () => {
       expect(result.status).toBe("pending");
     });
 
-    it("should accept absolute URLs", async () => {
+    it("should reject untrusted absolute URLs", async () => {
       const ctx = createAuthContext(1);
       const caller = appRouter.createCaller(ctx);
 
-      const result = await caller.prescription.upload({
-        imageUrl: "https://example.com/image.jpg",
-        imageKey: "prescriptions/test.jpg",
-        fileName: "prescription.jpg",
-      });
+      await expect(
+        caller.prescription.upload({
+          imageUrl: "https://example.com/image.jpg",
+          imageKey: "prescriptions/test.jpg",
+          fileName: "prescription.jpg",
+        })
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
 
-      expect(result.id).toBeDefined();
-      expect(result.status).toBe("pending");
+    it("should reject malformed storage paths", async () => {
+      const ctx = createAuthContext(1);
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prescription.upload({
+          imageUrl: "not-a-valid-storage-path",
+          imageKey: "prescriptions/test.jpg",
+          fileName: "prescription.jpg",
+        })
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
   });
 

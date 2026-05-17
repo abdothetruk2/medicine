@@ -13,6 +13,22 @@ import {
 import { invokeLLM } from "./_core/llm";
 import { TRPCError } from "@trpc/server";
 
+
+const trustedStoragePathRegex = /^\/manus-storage\/[A-Za-z0-9._\-/]+$/;
+
+function normalizeAndValidateImageUrl(rawImageUrl: string, req: { protocol?: string; get: (key: string) => string | null | undefined }) {
+  if (trustedStoragePathRegex.test(rawImageUrl)) {
+    const protocol = req.protocol || "https";
+    const host = req.get("host") || "localhost:3000";
+    return `${protocol}://${host}${rawImageUrl}`;
+  }
+
+  throw new TRPCError({
+    code: "BAD_REQUEST",
+    message: "imageUrl must be a trusted /manus-storage path",
+  });
+}
+
 // Medication type definition
 const MedicationType = z.object({
   name: z.string(),
@@ -199,7 +215,7 @@ export const appRouter = router({
     upload: protectedProcedure
       .input(
         z.object({
-          imageUrl: z.string(), // Can be relative /manus-storage/... or absolute URL
+          imageUrl: z.string().min(1),
           imageKey: z.string(),
           fileName: z.string(),
         })
@@ -216,14 +232,10 @@ export const appRouter = router({
 
         const prescriptionId = (result as any).insertId;
 
-        // Convert relative URL to absolute URL for LLM vision API
-        let absoluteImageUrl = input.imageUrl;
-        if (input.imageUrl.startsWith("/")) {
-          // Get the origin from the request
-          const protocol = ctx.req.protocol || "https";
-          const host = ctx.req.get("host") || "localhost:3000";
-          absoluteImageUrl = `${protocol}://${host}${input.imageUrl}`;
-        }
+        const absoluteImageUrl = normalizeAndValidateImageUrl(input.imageUrl, {
+          protocol: ctx.req.protocol,
+          get: key => ctx.req.get(key),
+        });
 
         // Start async analysis (fire and forget)
         analyzePrescriptionAsync(prescriptionId, absoluteImageUrl).catch(err =>

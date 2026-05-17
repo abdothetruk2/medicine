@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { storagePut } from "./storage";
+import { sdk } from "./_core/sdk";
 
 const router = express.Router();
 
@@ -25,7 +26,14 @@ const upload = multer({
  * POST /api/upload
  * Uploads a prescription image to S3 storage
  */
-router.post("/upload", (req, res, next) => {
+router.post("/upload", async (req, res, next) => {
+  try {
+    await sdk.authenticateRequest(req);
+  } catch (error) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+
   upload.single("file")(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
@@ -46,7 +54,13 @@ router.post("/upload", (req, res, next) => {
     // Generate a unique key for the file
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const fileExtension = req.file.originalname.split(".").pop() || "jpg";
+    const mimeToExtension: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif",
+    };
+    const fileExtension = mimeToExtension[req.file.mimetype] || "jpg";
     const key = `prescriptions/${timestamp}_${randomSuffix}.${fileExtension}`;
 
     // Upload to S3 using storagePut
